@@ -26,7 +26,7 @@ pip install .[demo]
 
 ### Running the `audio_ic` Command-Line Tool
 
-The [`audio_ic`](./audio_ic.py) command-line tool allows you to compute the *information content* (IC) of audio files efficiently. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files. Here's an example command:
+The [`audio_ic`](./audio_ic.py) command-line tool allows you to compute the *information content* (IC) of audio files. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files:
 
 ```bash
 python -m audio_ic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir>
@@ -36,7 +36,7 @@ Replace `<audio-file1>`, `<audio-file2>`, etc., with the paths to your audio fil
 
 
 ### Using the AudioIC programmatically
-The demo notebook demonstrates how to use the library programmatically to calculate and visualize the IC of audio files. To use the demo, ensure you have installed the package with the `demo` extras. Open the [`demo.ipynb`](./demo.ipynb) file in Jupyter Notebook or JupyterLab and follow the instructions provided.
+The [`demo.ipynb`](./demo.ipynb) notebook demonstrates how to use the library programmatically to calculate and visualize the IC of audio files.
 
 ## Citation
 If you use this project in your research, please cite the following paper:
