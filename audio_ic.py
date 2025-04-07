@@ -93,7 +93,7 @@ class ContinuousTransformerModel(torch.nn.Module):
 
 
 def from_ckpt(ckpt):
-    ckpt_dict = torch.load(ckpt,map_location='cpu')
+    ckpt_dict = torch.load(ckpt,map_location='cpu', weights_only=False)
     model_state_dict = ckpt_dict['model_state_dict']
     dim_out = model_state_dict['model.project_out.weight'].shape[0]
     max_seq_length = ckpt_dict['max_seq_length']
