@@ -93,6 +93,16 @@ class ContinuousTransformerModel(torch.nn.Module):
 
 
 def from_ckpt(ckpt):
+    """
+    Load a pre-trained ContinuousTransformerModel from a checkpoint file.
+
+    Args:
+        ckpt (str): Path to the checkpoint file.
+
+    Returns:
+        ContinuousTransformerModel: An instance of the ContinuousTransformerModel
+        loaded with the state dictionary from the checkpoint and set to evaluation mode.
+    """
     ckpt_dict = torch.load(ckpt,map_location='cpu', weights_only=False)
     model_state_dict = ckpt_dict['model_state_dict']
     dim_out = model_state_dict['model.project_out.weight'].shape[0]
@@ -111,45 +121,79 @@ def from_ckpt(ckpt):
     return model
 
 def compute_non_silence(audio, silence_extractor: str, fixed_sr: int):
+    """
+    Compute the non-silence regions of an audio signal.
+
+    Args:
+        audio (np.ndarray): The audio signal as a NumPy array.
+        silence_extractor (str): Method to compute non-silence regions ('music' or 'voice').
+        fixed_sr (int): The fixed sample rate of the audio signal.
+
+    Returns:
+        np.ndarray: An array of non-silence regions, where each row represents 
+                    [start_index, end_index] of a non-silent segment.
+    """
     if silence_extractor == "music":
+        # Use librosa's split function to detect non-silent regions in music
         non_silence = librosa.effects.split(audio)
     elif silence_extractor == "voice":
+        # Use torchaudio's Voice Activity Detection (VAD) for voice signals
         vad = torchaudio.transforms.Vad(sample_rate=fixed_sr)
         in_aud = torch.as_tensor(audio)
+        # Calculate the silence at the beginning and end of the audio
         heading_silence = (audio.shape[-1] - vad(in_aud).shape[-1])
         trailing_silence = (vad(in_aud.flip([-1])).shape[-1])
+        # Represent the non-silence region as a single range
         non_silence = np.array([[heading_silence, trailing_silence]])
     else:
+        # Raise an error if the silence extractor type is not implemented
         raise NotImplementedError
     return non_silence
-
 
 class ICCalcHelper:
     def __init__(
         self,
         device,
-        ckpt : Optional[str] = None,
-        
+        ckpt: Optional[str] = None,
     ):
+        """
+        Helper class for calculating Information Content (IC).
+
+        Args:
+            device (str): The device to use for computation (e.g., 'cuda' or 'cpu').
+            ckpt (Optional[str]): Path to the model checkpoint. If None, defaults to 'gmm.pt' in the library root.
+        """
         if ckpt is None:
             filepath = os.path.abspath(__file__)
             lib_root = os.path.dirname(filepath)
             ckpt = lib_root + '/gmm.pt'
+        # Load the model from the checkpoint and move it to the specified device
         self.model = from_ckpt(ckpt).to(device)
         self.device = device
+        # Initialize the EncoderDecoder for encoding audio to latent representations
         self.encdec = EncoderDecoder(device=device)
+
     @torch.no_grad
     def ic(
         self,
-        heading_nan_pad,
-        trailing_nan_pad,
-        len_wo_pad,
-        latents_padded,
+        heading_nan_pad: int,
+        trailing_nan_pad: int,
+        len_wo_pad: int,
+        latents_padded: torch.Tensor,
     ):
+        """
+        Calculate the negative log-likelihood (NLL) for the given latent representations.
 
-        nll = self.model.loss(
-            latents_padded
-        )
+        Args:
+            heading_nan_pad (int): Number of NaN padding values at the start of the sequence.
+            trailing_nan_pad (int): Number of NaN padding values at the end of the sequence.
+            len_wo_pad (int): Length of the sequence without padding.
+            latents_padded (torch.Tensor): Padded latent representations.
+
+        Returns:
+            np.ndarray: NLL values with NaN padding applied.
+        """
+        nll = self.model.loss(latents_padded)
         nll = nll[..., :len_wo_pad].to('cpu')
         nll = np.pad(
             nll,
@@ -161,33 +205,67 @@ class ICCalcHelper:
 
 
     def encode_m2l(self, audio_file: str | np.ndarray, silence_extractor):
+        """
+        Encodes an audio file or array into latent representations, while handling silence and padding.
+
+        Args:
+            audio_file (str | np.ndarray): Path to the audio file or a NumPy array of audio samples.
+            silence_extractor (str): Method to compute non-silence regions ('music' or 'voice').
+
+        Returns:
+            Tuple[int, int, int, torch.Tensor]: 
+                - heading_nan_pad: Number of NaN padding values at the start.
+                - trailing_nan_padding: Number of NaN padding values at the end.
+                - len_wo_pad: Length of the sequence without padding.
+                - latents_padded: Padded latent representations.
+        """
+        # If the input is a file path, read the audio file
         if isinstance(audio_file, str):
             audio, rate = sf.read(audio_file)
+            # Resample the audio to 44100 Hz if it has a different sample rate
             if rate != 44100:
                 audio_tensor = torch.from_numpy(audio)
-                # Apply resampling
                 resampler = torchaudio.transforms.Resample(orig_freq=rate, new_freq=44100)
                 audio = resampler(audio_tensor)
         else:
+            # If the input is already an array, assume a sample rate of 44100 Hz
             audio = audio_file
             rate = 44100
+
+        # If the audio has multiple channels, convert it to mono by averaging
         if len(audio.shape) == 2:
             audio = audio.mean(axis=1)
+
+        # Get the total number of audio samples
         audio_samples = len(audio)
+
+        # Compute the non-silence regions based on the specified silence extractor
         non_silence = compute_non_silence(audio, silence_extractor, rate)
-        heading_silence = non_silence[0][0]
-        trailing_silence = non_silence[-1][1]
+        heading_silence = non_silence[0][0]  # Silence at the beginning
+        trailing_silence = non_silence[-1][1]  # Silence at the end
+
+        # Calculate the number of NaN padding values for the start and end
         heading_nan_pad = math.floor(heading_silence / (rate * PERIODE_MUSIC_2_LATENT))
         trailing_nan_padding = math.ceil(
             (audio_samples - trailing_silence) / (rate * PERIODE_MUSIC_2_LATENT)
         )
+
+        # Remove the silence from the audio
         audio = audio[heading_silence:trailing_silence]
+
+        # Encode the audio into latent representations
         latents = self.encdec.encode(audio)
-        latents = latents.float().permute(0, 2, 1)
+        latents = latents.float().permute(0, 2, 1)  # Adjust dimensions for processing
+
+        # Get the length of the sequence without padding
         len_wo_pad = latents.shape[1]
+
+        # Pad the latent representations to a fixed length
         latents_padded = torch.nn.functional.pad(
             latents, (0, 0, 0, 4800 - latents.shape[1])
         )
+
+        # Return the padding information and the padded latent representations
         return heading_nan_pad, trailing_nan_padding, len_wo_pad, latents_padded
 
 def calc_ic(
