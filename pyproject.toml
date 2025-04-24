@@ -1,6 +1,6 @@
 [project]
 name = "audioic"
-version = "0.1.0"
+version = "0.1.1"
 description = "AudioIC Project"
 readme = "README.md"
 authors = [{name = "Mathias Rose Bjare", email = "muthissar@gmail.com"}]
