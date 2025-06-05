@@ -19,7 +19,7 @@ pip install audioic
 ```bash
 git clone https://github.com/sonycslparis/audioic.git
 cd audioic
-pip install .[demo]
+pip install ".[demo]"
 ```
 
 ## Usage

@@ -1,11 +1,11 @@
 [project]
 name = "audioic"
-version = "0.1.1"
+version = "0.1.2"
 description = "AudioIC Project"
 readme = "README.md"
 authors = [{name = "Mathias Rose Bjare", email = "muthissar@gmail.com"}]
 license = {text = "CC BY-NC 4.0"}
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 
 dependencies = [
     "music2latent",
