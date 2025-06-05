@@ -24,12 +24,12 @@ pip install ".[demo]"
 
 ## Usage
 
-### Running the `audio_ic` Command-Line Tool
+### Running the `audioic` Command-Line Tool
 
-The [`audio_ic`](./audio_ic.py) command-line tool allows you to compute the *information content* (IC) of audio files. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files:
+The [`audioic`](./audioic/audioic.py) command-line tool allows you to compute the *information content* (IC) of audio files. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files:
 
 ```bash
-python -m audio_ic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cpu"
+python -m audioic.audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cpu"
 ```
 
 Replace `<audio-file1>`, `<audio-file2>`, etc., with the paths to your audio files, and `<output-dir>` with the directory where you want the output files to be stored.
@@ -38,7 +38,7 @@ Replace `<audio-file1>`, `<audio-file2>`, etc., with the paths to your audio fil
 To run the tool on a GPU (default), specify the `--device` argument as `"cuda"`:
 
 ```bash
-CUDA_VISIBLE_DEVICES=<device-id> python -m audio_ic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cuda"
+CUDA_VISIBLE_DEVICES=<device-id> python -m audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cuda"
 ```
 Replace `<device-id>` by a cuda device id.
 
