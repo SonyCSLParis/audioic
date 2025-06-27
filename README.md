@@ -1,10 +1,9 @@
 # AudioIC
-This repository is the official implementation of the ICASSP 2025 paper ["Estimating Musical Surprisal in Audio"](https://arxiv.org/abs/2501.07474), retrained on open data. Below is the abstract of the paper:
+AudioIC provides tools for calculating the *information content* (IC) as a proxy for human experienced surprise when listening to music.  This repo is the official implementation of:
+- "Estimating Musical Surprisal from Audio in Autoregressive Diffusion Model Noise Spaces". **Code and documentation is coming soon**. 
+- ["Estimating Musical Surprisal in Audio"](https://arxiv.org/abs/2501.07474), retrained on open data. 
 
-> **Abstract**  
-> In modeling musical surprisal expectancy with computational methods, it has been proposed to use the information content (IC) of one-step predictions from an autoregressive model as a proxy for surprisal in symbolic music. With an appropriately chosen model, the IC of musical events has been shown to correlate with human perception of surprise and complexity aspects, including tonal and rhythmic complexity. This work investigates whether an analogous methodology can be applied to music audio. We train an autoregressive Transformer model to predict compressed latent audio representations of a pretrained autoencoder network. We verify learning effects by estimating the decrease in IC with repetitions. We investigate the mean IC of musical segment types (e.g., A or B) and find that segment types appearing later in a piece have a higher IC than earlier ones on average. We investigate the IC's relation to audio and musical features and find it correlated with timbral variations and loudness and, to a lesser extent, dissonance, rhythmic complexity, and onset density related to audio and musical features. Finally, we investigate if the IC can predict EEG responses to songs and thus model humans' surprisal in music.
-
-AudioIC provides tools for calculating the *information content* (IC) as a proxy for human experienced surprise when listening to music. It includes a command line tool and python classes for calculating IC.
+AudioIC includes a command line tool and python classes for calculating IC using a GIVT model.
 
 
 ## Installation
@@ -65,3 +64,4 @@ If you use this project in your research, please cite the following paper:
 
 ## License
 This project is licensed under the CC BY-NC 4.0 License.
+
