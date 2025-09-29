@@ -64,5 +64,6 @@ If you use this project in your research, please cite the following paper:
 
 ## License
 This project is licensed under the CC BY-NC 4.0 License.
+
 To obtain a commercial license, please contact [music@csl.sony.fr](mailto:music@csl.sony.fr).
 
