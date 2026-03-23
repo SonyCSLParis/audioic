@@ -5,7 +5,7 @@ description = "AudioIC Project"
 readme = "README.md"
 authors = [{name = "Mathias Rose Bjare", email = "muthissar@gmail.com"}]
 license = "CC-BY-NC-4.0"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11"
 
 dependencies = [
     "music2latent",
