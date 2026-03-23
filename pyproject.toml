@@ -9,14 +9,14 @@ requires-python = ">=3.11,<3.13"
 
 dependencies = [
     "music2latent",
-    "numpy>=1.23.4,<2.0.0",
+    "numpy>=1.23.4",
     "soundfile>=0.12.1",
-    "torch>=2.3.0,<2.6.0",
-    "torchaudio>=2.3.0,<2.6.0",
+    "torch>=2.3.0",
+    "torchaudio>=2.3.0",
     "librosa>=0.10.2.post1",
     "x-transformers==1.42",
     "einops>=0.8.0",
-    "jsonargparse[signatures]>=4.32.0,<5.0.0"
+    "jsonargparse[signatures]>=4.32.0"
 ]
 
 [project.urls]
