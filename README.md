@@ -1,7 +1,11 @@
 # AudioIC
-AudioIC provides tools for calculating information metrics from audio, including *information content* (IC) and differential entropy estimates. This repo is the official implementation of:
-- "Estimating Musical Surprisal from Audio in Autoregressive Diffusion Model Noise Spaces". **Code and documentation is coming soon**. 
-- ["Estimating Musical Surprisal in Audio"](https://arxiv.org/abs/2501.07474), retrained on open data. 
+AudioIC provides tools for calculating information metrics from audio, including *information content* (IC) and differential entropy estimates as proxies for human experienced uncertainty and surprise when listening to music. This repo is the official implementation of ["Estimating Musical Surprisal in Audio"](https://arxiv.org/abs/2501.07474), retrained on open data.
+
+For **code and documentation** for the **more recent models** of:
+- ["Estimating Musical Surprisal from Audio in Autoregressive Diffusion Model Noise Spaces"](https://arxiv.org/abs/2508.05306)
+- ["Perceptually Aligning Representations of Music via Noise-Augmented Autoencoders"](https://openreview.net/forum?id=rXUKO0ysUy),
+
+please use this repo [https://github.com/cpjku/pa-audioic](https://github.com/cpjku/pa-audioic).
 
 AudioIC includes a command line tool and python classes for calculating IC and entropy using a GIVT model.
 
