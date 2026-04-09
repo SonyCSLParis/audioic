@@ -6,6 +6,7 @@ import librosa
 from music2latent import EncoderDecoder
 import numpy as np
 import soundfile as sf
+import minimp3py
 import math
 import torch
 import torchaudio
@@ -45,6 +46,11 @@ class GMMIID:
         # extract means and covariance logits
         means, stds, mixing_logprobs = cls.unpack_out(params, n_modes)
         target = einops.repeat(target, '... d -> ... n_modes d', n_modes=n_modes)
+        # shape B, T, n_modes, D or B, T, samples, n_modes, D
+        if target.dim() == 5:
+            means, stds, mixing_logprobs  = means.unsqueeze(2), stds.unsqueeze(2), mixing_logprobs.unsqueeze(2)
+        elif target.dim() != 4:
+            raise ValueError(f"Target dimension {target.dim()} not understood. Should be either 4 (B, T, n_modes, D) or 5 (B, T, samples, n_modes, D)")
         logprob = torch.distributions.Normal(means, stds).log_prob(target).sum(-1, keepdims=True)
         summed = mixing_logprobs + logprob
         nll = torch.logsumexp(summed, dim=-2).neg()[..., 0]
@@ -63,6 +69,17 @@ class GMMIID:
     def get_n_modes(cls, dim_out: int, dim_data: int) -> int:
         n_modes = dim_out // (1+2*dim_data)
         return n_modes
+    
+    @classmethod
+    def sample(cls, means, stds, mixing_probs, generator=None, num_samples=1):
+        # num_components = mixing_probs.shape[-1]
+        bz, T, num_components, d = means.shape
+        components = torch.multinomial(mixing_probs.view(-1, num_components), num_samples=1).view(bz, T)
+        components_expanded = components[...,None,None].expand(bz, T, 1, d)
+        selected_means = torch.gather(means,2, components_expanded)
+        selected_stds = torch.gather(stds,2, components_expanded)
+        out = torch.randn((bz, T, num_samples, d), generator=generator, device=means.device)*selected_stds + selected_means
+        return out
 
 class ContinuousTransformerModel(torch.nn.Module):
     def __init__(self, dim_in, dim_out, max_seq_len, depth, heads, emb_dim = 256, attn_flash=True):
@@ -91,6 +108,24 @@ class ContinuousTransformerModel(torch.nn.Module):
         params = self(mag, mask=data_mask)
         loss_unreduced = GMMIID(dim_out=params.shape[-1], dim_data=mag.shape[-1], reduction='none')(params[:,:-1,:], mag[:,1:,:])
         return loss_unreduced
+    def entropy(self, mag, monte_carlo_samples=128):
+        data_mask = torch.ones(mag.size(0), mag.size(1)).bool().to(mag.device)
+        params = self(mag, mask=data_mask)
+        
+        # Unpack parameters to get distribution components
+        means, stds, mixing_logprobs = GMMIID.unpack_out(params, dim_data=mag.shape[-1])
+        mixing_probs = torch.exp(mixing_logprobs)
+        
+        # Sample monte_carlo_samples times and calculate average nlogp
+        
+        samples = GMMIID.sample(means, stds, mixing_probs, num_samples=monte_carlo_samples)
+        # Calculate nlogp for each sample
+        n_modes = GMMIID.get_n_modes(dim_out=params.shape[-1], dim_data=mag.shape[-1])
+        nlogp = GMMIID.nlogp(params, samples, reduction='none', n_modes=n_modes)
+        
+        # Average nlogp across samples for each element in the sequence
+        entropy = nlogp.mean(dim=-1)
+        return entropy
 
 
 def from_ckpt(ckpt):
@@ -158,7 +193,7 @@ class ICCalcHelper:
         ckpt: Optional[str] = None,
     ):
         """
-        Helper class for calculating Information Content (IC).
+        Helper class for calculating Information metrics (IC or entropy).
 
         Args:
             device (str): The device to use for computation (e.g., 'cuda' or 'cpu').
@@ -175,34 +210,45 @@ class ICCalcHelper:
         self.encdec = EncoderDecoder(device=device)
 
     @torch.no_grad
-    def ic(
+    def calc(
         self,
         heading_nan_pad: int,
         trailing_nan_pad: int,
         len_wo_pad: int,
         latents_padded: torch.Tensor,
+        metric: str = 'ic',
+        monte_carlo_samples: int = None
     ):
         """
-        Calculate the negative log-likelihood (NLL) for the given latent representations.
+        Calculate a predictive metric for the given latent representations.
 
         Args:
             heading_nan_pad (int): Number of NaN padding values at the start of the sequence.
             trailing_nan_pad (int): Number of NaN padding values at the end of the sequence.
             len_wo_pad (int): Length of the sequence without padding.
             latents_padded (torch.Tensor): Padded latent representations.
-
+            metric (str): Metric to calculate ('ic' or 'entropy').
+            monte_carlo_samples (int): Number of Monte Carlo samples for entropy estimation.
         Returns:
-            np.ndarray: NLL values with NaN padding applied.
+            np.ndarray: Metric values with NaN padding applied.
         """
-        nll = self.model.loss(latents_padded)
-        nll = nll[..., :len_wo_pad].to('cpu')
-        nll = np.pad(
-            nll,
+        metric = metric.lower()
+        if metric == "ic":
+            metric = self.model.loss(latents_padded)
+        elif metric == "entropy":
+            if monte_carlo_samples <= 0:
+                raise ValueError("monte_carlo_samples must be > 0 when metric='entropy'")
+            metric = self.model.entropy(latents_padded, monte_carlo_samples=monte_carlo_samples)
+        else:
+            raise NotImplementedError(f"Metric {metric} not implemented")
+        metric = metric[..., :len_wo_pad].to('cpu')
+        metric = np.pad(
+            metric,
             ((0, 0), (heading_nan_pad, trailing_nan_pad)),
             mode="constant",
             constant_values=np.nan,
         )
-        return nll
+        return metric
 
 
     def encode_m2l(self, audio_file: str | np.ndarray, silence_extractor):
@@ -222,7 +268,10 @@ class ICCalcHelper:
         """
         # If the input is a file path, read the audio file
         if isinstance(audio_file, str):
-            audio, rate = sf.read(audio_file)
+            if audio_file.lower().endswith('.mp3'):
+                audio, rate = minimp3py.read(audio_file)
+            else:
+                audio, rate = sf.read(audio_file)
             # Resample the audio to 44100 Hz if it has a different sample rate
             if rate != 44100:
                 audio_tensor = torch.from_numpy(audio)
@@ -269,13 +318,15 @@ class ICCalcHelper:
         # Return the padding information and the padded latent representations
         return heading_nan_pad, trailing_nan_padding, len_wo_pad, latents_padded
 
-def calc_ic(
+def calc(
     audio_files: List[str] = ['Acoustic Grand Piano.wav'],
     audio_type: str = 'music',
     output_dir: str = './',
-    device: str = 'cuda'
+    device: str = 'cuda',
+    metric: str = 'ic',
+    monte_carlo_samples: int = None
 ):
-    """Calculate the Information Content (IC) for each audio file.
+    """Calculate IC or entropy for each audio file.
     
     Args:
         audio_files (List[str], optional): A list of audio file paths to process. 
@@ -286,20 +337,24 @@ def calc_ic(
             Defaults to './'.
         device (str, optional): The device to use for computation (e.g., 'cuda' or 'cpu'). 
             Defaults to 'cuda'.
+        metric (str, optional): The metric to calculate ('ic' or 'entropy'). 
+            Defaults to 'ic'.
+        monte_carlo_samples (int, optional): The number of Monte Carlo samples to use for entropy calculation. 
+            Defaults to None.
     """
     ic_calc_helper = ICCalcHelper(device=device)
     for audio_file in audio_files:
         heading_nan_pad, trailing_nan_padding, len_wo_pad, latents_padded = ic_calc_helper.encode_m2l(audio_file, silence_extractor=audio_type)
-        nll = ic_calc_helper.ic(heading_nan_pad, trailing_nan_padding, len_wo_pad, latents_padded)
-        nll = nll[0]
-        time = (np.arange(len(nll)) + 1) * PERIODE_MUSIC_2_LATENT
+        values = ic_calc_helper.calc(heading_nan_pad, trailing_nan_padding, len_wo_pad, latents_padded, metric=metric, monte_carlo_samples=monte_carlo_samples)
+        values = values[0]
+        time = (np.arange(len(values)) + 1) * PERIODE_MUSIC_2_LATENT
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         csv_filename = output_dir.joinpath(f"{Path(audio_file).stem}.csv")
         with open(csv_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['Time', 'IC'])
-            writer.writerows(zip(time, nll))           
+            writer.writerow(['Time', metric.upper()])
+            writer.writerows(zip(time, values))           
 if __name__ == '__main__':
-    CLI(calc_ic, as_positional=True)
+    CLI(calc, as_positional=True)
     

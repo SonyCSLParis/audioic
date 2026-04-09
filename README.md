@@ -1,9 +1,9 @@
 # AudioIC
-AudioIC provides tools for calculating the *information content* (IC) as a proxy for human experienced surprise when listening to music.  This repo is the official implementation of:
+AudioIC provides tools for calculating information metrics from audio, including *information content* (IC) and differential entropy estimates. This repo is the official implementation of:
 - "Estimating Musical Surprisal from Audio in Autoregressive Diffusion Model Noise Spaces". **Code and documentation is coming soon**. 
 - ["Estimating Musical Surprisal in Audio"](https://arxiv.org/abs/2501.07474), retrained on open data. 
 
-AudioIC includes a command line tool and python classes for calculating IC using a GIVT model.
+AudioIC includes a command line tool and python classes for calculating IC and entropy using a GIVT model.
 
 
 ## Installation
@@ -25,11 +25,19 @@ pip install ".[demo]"
 
 ### Running the `audioic` Command-Line Tool
 
-The [`audioic`](./audioic/audioic.py) command-line tool allows you to compute the *information content* (IC) of audio files. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files:
+The [`audioic`](./audioic/audioic.py) command-line tool allows you to compute either *information content* (IC) or *entropy* for audio files. To use it, specify the audio files you want to process and provide an output directory where the results will be saved as CSV files:
 
 ```bash
-python -m audioic.audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cpu"
+python -m audioic.audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cpu" --metric ic
 ```
+To run entropy estimation with Monte Carlo sampling:
+
+```bash
+python -m audioic.audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cpu" --metric entropy --monte_carlo_samples 128
+```
+
+The output CSV column is named according to the selected metric (`IC` or `ENTROPY`).
+
 
 Replace `<audio-file1>`, `<audio-file2>`, etc., with the paths to your audio files, and `<output-dir>` with the directory where you want the output files to be stored.
 
@@ -37,13 +45,13 @@ Replace `<audio-file1>`, `<audio-file2>`, etc., with the paths to your audio fil
 To run the tool on a GPU (default), specify the `--device` argument as `"cuda"`:
 
 ```bash
-CUDA_VISIBLE_DEVICES=<device-id> python -m audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cuda"
+CUDA_VISIBLE_DEVICES=<device-id> python -m audioic.audioic --audio_files "['<audio-file1>', '<audio-file2>', ...]" --output_dir <output-dir> --device "cuda" --metric ic
 ```
 Replace `<device-id>` by a cuda device id.
 
 
 ### Using the AudioIC programmatically
-The [`demo.ipynb`](./demo.ipynb) notebook demonstrates how to use the library programmatically to calculate and visualize the IC of audio files.
+The [`demo.ipynb`](./demo.ipynb) notebook demonstrates how to use the library programmatically to calculate and visualize IC for audio files. The same API also supports entropy via the `metric='entropy'` option.
 
 ## Citation
 If you use this project in your research, please cite the following paper:

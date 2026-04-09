@@ -16,7 +16,8 @@ dependencies = [
     "librosa>=0.10.2.post1",
     "x-transformers==1.42",
     "einops>=0.8.0",
-    "jsonargparse[signatures]>=4.32.0,<5.0.0"
+    "jsonargparse[signatures]>=4.32.0,<5.0.0",
+    "minimp3py@https://github.com/f0k/minimp3py/archive/master.zip"
 ]
 
 [project.urls]
